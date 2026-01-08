@@ -1,5 +1,6 @@
 const inquirer = require('inquirer');
 const productService = require('./services/productService');
+const { printProductTable } = require('./utils/tablePrinter');
 
 async function main() {
   console.log('Bem-vindo à AgilStore!');
@@ -48,7 +49,7 @@ async function main() {
       console.error('Ocorreu um erro:', error.message);
     }
     
-    // Dá um tempinho pro usuário ler antes de limpar ou mostrar o menu de novo
+    // Pausa para leitura antes de exibir o menu novamente
     if (action !== 'list' && action !== 'search') {
         await new Promise(resolve => setTimeout(resolve, 1000));
     }
@@ -112,32 +113,45 @@ function handleListProducts() {
   const products = productService.listProducts();
   if (products.length === 0) {
     console.log('Nenhum produto cadastrado.');
-  } else {
-    console.table(products);
+    return;
   }
-}
+    printProductTable(products);
+  }
+
 
 async function handleUpdateProduct() {
+  const products = productService.listProducts();
+  if (products.length === 0) {
+    console.log('Nenhum produto cadastrado para atualizar.');
+    return;
+  }
+
   const { id } = await inquirer.prompt([
     {
-      type: 'input',
+      type: 'list',
       name: 'id',
-      message: 'Informe o ID do produto para atualizar (ou deixe vazio para voltar):'
+      message: 'Selecione o produto para atualizar:',
+      choices: [
+        ...products.map(p => ({
+          name: `${p.name} (${p.category}) - R$ ${p.price}`,
+          value: p.id
+        })),
+        new inquirer.Separator(),
+        { name: 'Voltar', value: 'back' }
+      ]
     }
   ]);
 
-  if (!id.trim()) return;
+  if (id === 'back') return;
 
   const product = productService.getProductById(id);
-  if (!product) {
-    console.log('Produto não encontrado!');
-    return;
-  }
-  // Rest of update function...
+  // Não precisamos verificar se product existe pois veio da lista, mas mantemos por segurança
+
+  // Prepara o usuário para o fluxo de atualização
   console.log(`Atualizando "${product.name}" (Deixe em branco para manter o valor atual)`);
 
   const updates = await inquirer.prompt([
-// ... existing update prompts
+  // Coleta as novas informações do produto caso o usuario queira mudar
     {
       type: 'input',
       name: 'name',
@@ -175,22 +189,32 @@ async function handleUpdateProduct() {
 }
 
 async function handleDeleteProduct() {
+  const products = productService.listProducts();
+  if (products.length === 0) {
+    console.log('Nenhum produto cadastrado para excluir.');
+    return;
+  }
+
   const { id } = await inquirer.prompt([
     {
-      type: 'input',
+      type: 'list',
       name: 'id',
-      message: 'Informe o ID do produto para excluir (ou deixe vazio para voltar):'
+      message: 'Selecione o produto para excluir:',
+      choices: [
+        ...products.map(p => ({
+          name: `${p.name} (${p.category}) - R$ ${p.price}`,
+          value: p.id
+        })),
+        new inquirer.Separator(),
+        { name: 'Voltar', value: 'back' }
+      ]
     }
   ]);
 
-  if (!id.trim()) return;
+  if (id === 'back') return;
 
   const product = productService.getProductById(id);
-// ... existing delete logic
-  if (!product) {
-    console.log('Produto não encontrado!');
-    return;
-  }
+  // Verifica se o produto existe antes de tentar excluir
 
   const { confirm } = await inquirer.prompt([
     {
@@ -221,12 +245,12 @@ async function handleSearchProduct() {
   if (!term.trim()) return;
 
   const results = productService.searchProduct(term);
-// ... existing search logic
+  // Verifica os resultados da busca e exibe a tabela
   if (results.length === 0) {
     console.log('Nenhum produto encontrado.');
   } else {
     console.log(`Encontrados ${results.length} produto(s):`);
-    console.table(results);
+    printProductTable(results);
   }
 }
 
